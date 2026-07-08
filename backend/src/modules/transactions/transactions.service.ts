@@ -11,8 +11,15 @@ export function calculateSettlementDate(createdAt: Date, type: SettlementType): 
   if (type === SettlementType.T0) {
     return date;
   }
+
+  function getJakartaDay(d: Date): number {
+    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta', weekday: 'short' });
+    const weekdayStr = formatter.format(d);
+    const daysMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return daysMap[weekdayStr] ?? d.getDay();
+  }
   
-  const day = date.getDay();
+  let day = getJakartaDay(date);
   if (day === 6) { // Saturday
     date.setDate(date.getDate() + 2); // Monday
   } else if (day === 0) { // Sunday
@@ -20,9 +27,10 @@ export function calculateSettlementDate(createdAt: Date, type: SettlementType): 
   }
   
   date.setDate(date.getDate() + 1);
-  if (date.getDay() === 6) {
+  day = getJakartaDay(date);
+  if (day === 6) {
     date.setDate(date.getDate() + 2);
-  } else if (date.getDay() === 0) {
+  } else if (day === 0) {
     date.setDate(date.getDate() + 1);
   }
   

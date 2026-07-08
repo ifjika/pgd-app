@@ -290,7 +290,14 @@ export class SimulatorService {
 
     try {
       const now = new Date();
-      const currentHour = now.getHours();
+      const currentHour = parseInt(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Jakarta',
+          hour: 'numeric',
+          hour12: false
+        }).format(now),
+        10
+      );
 
       // Check EOD Maintenance Window
       if (currentHour >= 1 && currentHour < 4) {

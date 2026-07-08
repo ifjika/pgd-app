@@ -39,6 +39,7 @@ import { SeedModule } from './database/seeds/seed.module';
         autoLoadEntities: true,
         synchronize: configService.get<string>('app.nodeEnv') !== 'production',
         logging: configService.get<boolean>('database.logging'),
+        timezone: configService.get<string>('database.timezone', 'Z'),
       }),
     }),
 

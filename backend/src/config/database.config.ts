@@ -11,4 +11,5 @@ export default registerAs('database', () => ({
   autoLoadEntities: true,
   synchronize: process.env.NODE_ENV !== 'production',
   logging: process.env.DB_LOGGING === 'true',
+  timezone: 'Z',
 }));

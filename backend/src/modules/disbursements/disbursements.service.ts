@@ -68,7 +68,14 @@ export class DisbursementsService {
     const netAmount = dto.amount - fee;
 
     const now = new Date();
-    const currentHour = now.getHours();
+    const currentHour = parseInt(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jakarta',
+        hour: 'numeric',
+        hour12: false
+      }).format(now),
+      10
+    );
     let description = dto.description || '';
     if (currentHour >= 1 && currentHour < 4) {
       description = (description ? description + ' | ' : '') + 'Held due to EOD maintenance window (01:00 AM - 04:00 AM)';

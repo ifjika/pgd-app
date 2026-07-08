@@ -8,8 +8,10 @@ import { User, UserRole } from '../../modules/auth/entities/user.entity';
 import { Merchant, MerchantStatus } from '../../modules/merchants/entities/merchant.entity';
 import { Customer } from '../../modules/customers/entities/customer.entity';
 import { PaymentMethod, PaymentMethodType } from '../../modules/payment-methods/entities/payment-method.entity';
-import { Transaction, TransactionStatus, TransactionCurrency } from '../../modules/transactions/entities/transaction.entity';
+import { Transaction, TransactionStatus, TransactionCurrency, SettlementType } from '../../modules/transactions/entities/transaction.entity';
+import { calculateSettlementDate } from '../../modules/transactions/transactions.service';
 import { WebhookLog, WebhookEvent, WebhookDeliveryStatus } from '../../modules/webhooks/entities/webhook-log.entity';
+import { Disbursement, DisbursementStatus, DisbursementChannelType } from '../../modules/disbursements/entities/disbursement.entity';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -22,18 +24,121 @@ export class SeedService implements OnModuleInit {
     @InjectRepository(PaymentMethod) private readonly paymentMethodRepo: Repository<PaymentMethod>,
     @InjectRepository(Transaction) private readonly transactionRepo: Repository<Transaction>,
     @InjectRepository(WebhookLog) private readonly webhookLogRepo: Repository<WebhookLog>,
+    @InjectRepository(Disbursement) private readonly disbursementRepo: Repository<Disbursement>,
   ) {}
 
   async onModuleInit() {
     const userCount = await this.userRepo.count();
-    if (userCount > 0) {
-      this.logger.log('Database already seeded, skipping...');
+    if (userCount === 0) {
+      this.logger.log('🌱 Seeding database with dummy data...');
+      await this.seed();
+      this.logger.log('✅ Database seeding complete!');
       return;
     }
 
-    this.logger.log('🌱 Seeding database with dummy data...');
-    await this.seed();
-    this.logger.log('✅ Database seeding complete!');
+    const disbursementCount = await this.disbursementRepo.count();
+    if (disbursementCount === 0) {
+      this.logger.log('🌱 Seeding disbursements only...');
+      await this.seedDisbursementsOnly();
+      this.logger.log('✅ Disbursements seeding complete!');
+    } else {
+      this.logger.log('Database already seeded (including disbursements), skipping...');
+    }
+
+    // Backfill transaction reference IDs and settlements if null
+    const existingTransactions = await this.transactionRepo.find();
+    let updatedCount = 0;
+    for (const tx of existingTransactions) {
+      let changed = false;
+      const rand = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+      if (!tx.issuerOrderId) {
+        tx.issuerOrderId = `ISS-${Date.now()}-${rand()}`;
+        changed = true;
+      }
+      if (!tx.refId) {
+        tx.refId = `REF-${Date.now()}-${rand()}`;
+        changed = true;
+      }
+      if (!tx.merchantRefId) {
+        tx.merchantRefId = `MREF-${Date.now()}-${rand()}`;
+        changed = true;
+      }
+      if (!tx.settlementType) {
+        tx.settlementType = Math.random() < 0.3 ? SettlementType.T0 : SettlementType.T1;
+        changed = true;
+      }
+      if (tx.status === TransactionStatus.SUCCESS && !tx.settlementDate) {
+        tx.settlementDate = calculateSettlementDate(tx.createdAt || new Date(), tx.settlementType);
+        changed = true;
+      }
+      if (changed) {
+        await this.transactionRepo.save(tx);
+        updatedCount++;
+      }
+    }
+    if (updatedCount > 0) {
+      this.logger.log(`  → Backfilled ${updatedCount} transactions with new reference IDs and settlements`);
+    }
+  }
+
+  async seedDisbursementsOnly() {
+    const merchants = await this.merchantRepo.find();
+    if (merchants.length === 0) return;
+
+    const disbursementChannels = [
+      { type: DisbursementChannelType.E_WALLET, channel: 'DANA' },
+      { type: DisbursementChannelType.E_WALLET, channel: 'OVO' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'MANDIRI' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'BRI' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'BNI' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'BCA' },
+    ];
+    const disbursementStatuses = [
+      DisbursementStatus.SUCCESS,
+      DisbursementStatus.SUCCESS,
+      DisbursementStatus.SUCCESS,
+      DisbursementStatus.FAILED,
+      DisbursementStatus.PENDING,
+      DisbursementStatus.PROCESSING,
+    ];
+    const recipientNames = ['Alice Wati', 'Bob Santoso', 'Charlie Fauzi', 'Daniel Mueller', 'Eva Garcia'];
+
+    const disbursements: Disbursement[] = [];
+    for (let i = 0; i < 30; i++) {
+      const merchant = merchants[Math.floor(Math.random() * merchants.length)]!;
+      const chanInfo = disbursementChannels[Math.floor(Math.random() * disbursementChannels.length)]!;
+      const status = disbursementStatuses[Math.floor(Math.random() * disbursementStatuses.length)]!;
+      const amount = Math.floor(Math.random() * 2000000 + 50000); // 50K - 2.05M IDR
+      const fee = 1500;
+      const netAmount = amount - fee;
+
+      const createdAt = new Date();
+      createdAt.setDate(createdAt.getDate() - Math.floor(Math.random() * 30));
+      createdAt.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
+
+      const disbursement = this.disbursementRepo.create({
+        orderId: `DIS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        issuerOrderId: `ISS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        refId: `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        merchantRefId: `MREF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        merchantId: merchant.id,
+        amount,
+        fee,
+        netAmount,
+        currency: 'IDR',
+        status,
+        channelType: chanInfo.type,
+        channel: chanInfo.channel,
+        recipientAccount: chanInfo.type === DisbursementChannelType.E_WALLET ? '08' + Math.floor(100000000 + Math.random() * 900000000) : Math.floor(1000000000 + Math.random() * 9000000000).toString(),
+        recipientName: recipientNames[Math.floor(Math.random() * recipientNames.length)]!,
+        description: `Refund / payment for invoice #${i + 100}`,
+        failureReason: status === DisbursementStatus.FAILED ? 'Recipient account validation failed' : undefined,
+        createdAt,
+      });
+
+      disbursements.push(await this.disbursementRepo.save(disbursement));
+    }
+    this.logger.log(`  → ${disbursements.length} disbursements seeded`);
   }
 
   async seed() {
@@ -182,8 +287,12 @@ export class SeedService implements OnModuleInit {
       createdAt.setDate(createdAt.getDate() - Math.floor(Math.random() * 30));
       createdAt.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
 
+      const settlementType = Math.random() < 0.3 ? SettlementType.T0 : SettlementType.T1;
       const transaction = this.transactionRepo.create({
         orderId: `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        issuerOrderId: `ISS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        refId: `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        merchantRefId: `MREF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         merchantId: merchant.id,
         customerId: customer.id,
         paymentMethodId: paymentMethod.id,
@@ -192,6 +301,8 @@ export class SeedService implements OnModuleInit {
         netAmount,
         currency,
         status,
+        settlementType,
+        settlementDate: status === TransactionStatus.SUCCESS ? calculateSettlementDate(createdAt, settlementType) : undefined,
         idempotencyKey: uuidv4(),
         description: descriptions[Math.floor(Math.random() * descriptions.length)],
         metadata: { source: 'seed', batchId: 'initial' },
@@ -229,5 +340,61 @@ export class SeedService implements OnModuleInit {
       webhookCount++;
     }
     this.logger.log(`  → ${webhookCount} webhook logs created`);
+
+    // 7. Seed disbursements
+    const disbursementChannels = [
+      { type: DisbursementChannelType.E_WALLET, channel: 'DANA' },
+      { type: DisbursementChannelType.E_WALLET, channel: 'OVO' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'MANDIRI' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'BRI' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'BNI' },
+      { type: DisbursementChannelType.BANK_TRANSFER, channel: 'BCA' },
+    ];
+    const disbursementStatuses = [
+      DisbursementStatus.SUCCESS,
+      DisbursementStatus.SUCCESS,
+      DisbursementStatus.SUCCESS,
+      DisbursementStatus.FAILED,
+      DisbursementStatus.PENDING,
+      DisbursementStatus.PROCESSING,
+    ];
+    const recipientNames = ['Alice Wati', 'Bob Santoso', 'Charlie Fauzi', 'Daniel Mueller', 'Eva Garcia'];
+
+    const disbursements: Disbursement[] = [];
+    for (let i = 0; i < 30; i++) {
+      const merchant = merchants[Math.floor(Math.random() * merchants.length)]!;
+      const chanInfo = disbursementChannels[Math.floor(Math.random() * disbursementChannels.length)]!;
+      const status = disbursementStatuses[Math.floor(Math.random() * disbursementStatuses.length)]!;
+      const amount = Math.floor(Math.random() * 2000000 + 50000); // 50K - 2.05M IDR
+      const fee = 1500;
+      const netAmount = amount - fee;
+
+      const createdAt = new Date();
+      createdAt.setDate(createdAt.getDate() - Math.floor(Math.random() * 30));
+      createdAt.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
+
+      const disbursement = this.disbursementRepo.create({
+        orderId: `DIS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        issuerOrderId: `ISS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        refId: `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        merchantRefId: `MREF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        merchantId: merchant.id,
+        amount,
+        fee,
+        netAmount,
+        currency: 'IDR',
+        status,
+        channelType: chanInfo.type,
+        channel: chanInfo.channel,
+        recipientAccount: chanInfo.type === DisbursementChannelType.E_WALLET ? '08' + Math.floor(100000000 + Math.random() * 900000000) : Math.floor(1000000000 + Math.random() * 9000000000).toString(),
+        recipientName: recipientNames[Math.floor(Math.random() * recipientNames.length)]!,
+        description: `Refund / payment for invoice #${i + 100}`,
+        failureReason: status === DisbursementStatus.FAILED ? 'Recipient account validation failed' : undefined,
+        createdAt,
+      });
+
+      disbursements.push(await this.disbursementRepo.save(disbursement));
+    }
+    this.logger.log(`  → ${disbursements.length} disbursements created`);
   }
 }

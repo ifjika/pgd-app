@@ -13,6 +13,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SimulatorModule } from './modules/simulator/simulator.module';
+import { DisbursementsModule } from './modules/disbursements/disbursements.module';
 import { SeedModule } from './database/seeds/seed.module';
 
 @Module({
@@ -54,6 +55,7 @@ import { SeedModule } from './database/seeds/seed.module';
     PaymentMethodsModule,
     AnalyticsModule,
     SimulatorModule,
+    DisbursementsModule,
 
     // Database seeding
     SeedModule,

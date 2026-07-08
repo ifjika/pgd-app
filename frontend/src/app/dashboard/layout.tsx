@@ -15,6 +15,7 @@ import {
   LogOut,
   CreditCard,
   Zap,
+  Send,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   ]},
   { section: "Payments", items: [
     { href: "/dashboard/transactions", icon: ArrowLeftRight, label: "Transactions" },
+    { href: "/dashboard/disbursements", icon: Send, label: "Disbursements" },
     { href: "/dashboard/refunds", icon: Undo2, label: "Refunds" },
     { href: "/dashboard/payment-methods", icon: CreditCard, label: "Payment Methods" },
   ]},

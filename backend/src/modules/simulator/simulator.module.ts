@@ -8,6 +8,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { PaymentMethod } from '../payment-methods/entities/payment-method.entity';
 import { Refund } from '../refunds/entities/refund.entity';
 import { WebhookLog } from '../webhooks/entities/webhook-log.entity';
+import { Disbursement } from '../disbursements/entities/disbursement.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { WebhookLog } from '../webhooks/entities/webhook-log.entity';
       PaymentMethod,
       Refund,
       WebhookLog,
+      Disbursement,
     ]),
   ],
   controllers: [SimulatorController],

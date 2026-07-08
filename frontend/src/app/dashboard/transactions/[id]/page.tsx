@@ -9,6 +9,9 @@ import { formatCurrency, formatDate, getStatusBadgeClass } from "@/lib/utils";
 interface Transaction {
   id: string;
   orderId: string;
+  issuerOrderId?: string;
+  refId?: string;
+  merchantRefId?: string;
   amount: number;
   fee: number;
   netAmount: number;
@@ -133,23 +136,42 @@ export default function TransactionDetailPage() {
             </div>
           </div>
 
-          {/* Customer & Merchant */}
-          <div className="glass-card" style={{ padding: 24 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Parties</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                ["Merchant", tx.merchant?.name || "—"],
-                ["Customer", tx.customer?.name || "—"],
-                ["Customer Email", tx.customer?.email || "—"],
-                ["Created", formatDate(tx.createdAt)],
-                ...(tx.processedAt ? [["Processed", formatDate(tx.processedAt)]] : []),
-                ["Idempotency Key", tx.idempotencyKey?.substring(0, 16) + "..."],
-              ].map(([label, value]) => (
-                <div key={String(label)} style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</span>
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
-                </div>
-              ))}
+          {/* Customer & Merchant & References */}
+          <div className="glass-card" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Parties</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  ["Merchant", tx.merchant?.name || "—"],
+                  ["Customer", tx.customer?.name || "—"],
+                  ["Customer Email", tx.customer?.email || "—"],
+                  ["Created", formatDate(tx.createdAt)],
+                  ...(tx.processedAt ? [["Processed", formatDate(tx.processedAt)]] : []),
+                  ["Idempotency Key", tx.idempotencyKey?.substring(0, 16) + "..."],
+                ].map(([label, value]) => (
+                  <div key={String(label)} style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Reference IDs</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[
+                  ["Order ID", tx.orderId],
+                  ["Issuer Order ID", tx.issuerOrderId || "—"],
+                  ["Ref ID", tx.refId || "—"],
+                  ["Merchant Ref ID", tx.merchantRefId || "—"],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: "var(--bg-card)", padding: "8px 12px", borderRadius: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{label}</span>
+                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

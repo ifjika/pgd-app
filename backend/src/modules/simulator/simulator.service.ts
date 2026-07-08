@@ -4,12 +4,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import { Transaction, TransactionStatus, TransactionCurrency } from '../transactions/entities/transaction.entity';
+import { Transaction, TransactionStatus, TransactionCurrency, SettlementType } from '../transactions/entities/transaction.entity';
+import { calculateSettlementDate } from '../transactions/transactions.service';
 import { Merchant } from '../merchants/entities/merchant.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { PaymentMethod } from '../payment-methods/entities/payment-method.entity';
 import { Refund, RefundStatus } from '../refunds/entities/refund.entity';
 import { WebhookLog, WebhookEvent, WebhookDeliveryStatus } from '../webhooks/entities/webhook-log.entity';
+import { Disbursement, DisbursementStatus } from '../disbursements/entities/disbursement.entity';
 
 @Injectable()
 export class SimulatorService {
@@ -23,6 +25,7 @@ export class SimulatorService {
     @InjectRepository(PaymentMethod) private readonly paymentMethodRepo: Repository<PaymentMethod>,
     @InjectRepository(Refund) private readonly refundRepo: Repository<Refund>,
     @InjectRepository(WebhookLog) private readonly webhookLogRepo: Repository<WebhookLog>,
+    @InjectRepository(Disbursement) private readonly disbursementRepo: Repository<Disbursement>,
     private readonly configService: ConfigService,
   ) {
     this.isEnabled = this.configService.get<boolean>('app.simulatorEnabled', true);
@@ -71,6 +74,9 @@ export class SimulatorService {
 
         const transaction = this.transactionRepo.create({
           orderId: `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          issuerOrderId: `ISS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          refId: `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          merchantRefId: `MREF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
           merchantId: merchant.id,
           customerId: customer.id,
           paymentMethodId: paymentMethod.id,
@@ -79,6 +85,7 @@ export class SimulatorService {
           netAmount,
           currency,
           status: TransactionStatus.PENDING,
+          settlementType: Math.random() < 0.3 ? SettlementType.T0 : SettlementType.T1,
           idempotencyKey: uuidv4(),
           description: descriptions[Math.floor(Math.random() * descriptions.length)],
           metadata: { source: 'simulator', generatedAt: new Date().toISOString() },
@@ -116,6 +123,9 @@ export class SimulatorService {
         const isSuccess = Math.random() < 0.85;
         tx.status = isSuccess ? TransactionStatus.SUCCESS : TransactionStatus.FAILED;
         tx.processedAt = new Date();
+        if (isSuccess) {
+          tx.settlementDate = calculateSettlementDate(tx.createdAt, tx.settlementType);
+        }
 
         if (!isSuccess) {
           const reasons = [
@@ -270,6 +280,50 @@ export class SimulatorService {
       }
     } catch (error) {
       this.logger.error('Simulator error processing refunds:', error);
+    }
+  }
+
+  // Process pending disbursements every 20 seconds
+  @Cron('*/20 * * * * *')
+  async processDisbursements() {
+    if (!this.isEnabled) return;
+
+    try {
+      const now = new Date();
+      const currentHour = now.getHours();
+
+      // Check EOD Maintenance Window
+      if (currentHour >= 1 && currentHour < 4) {
+        this.logger.debug('⏳ Simulator: EOD Maintenance window (01:00 AM - 04:00 AM) active. Holding all disbursements.');
+        return;
+      }
+
+      const pending = await this.disbursementRepo.find({
+        where: { status: In([DisbursementStatus.PENDING, DisbursementStatus.PROCESSING]) as any },
+        take: 5,
+      });
+
+      for (const db of pending) {
+        if (db.status === DisbursementStatus.PENDING) {
+          db.status = DisbursementStatus.PROCESSING;
+          await this.disbursementRepo.save(db);
+          continue;
+        }
+
+        // Processing → Success (90%) or Failed (10%)
+        const isSuccess = Math.random() < 0.90;
+        db.status = isSuccess ? DisbursementStatus.SUCCESS : DisbursementStatus.FAILED;
+        if (!isSuccess) {
+          db.failureReason = 'Partner bank system timeout';
+        }
+        await this.disbursementRepo.save(db);
+      }
+
+      if (pending.length > 0) {
+        this.logger.debug(`💸 Simulator: Processed ${pending.length} disbursement(s)`);
+      }
+    } catch (error) {
+      this.logger.error('Simulator error processing disbursements:', error);
     }
   }
 

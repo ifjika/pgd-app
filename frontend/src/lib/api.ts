@@ -60,6 +60,14 @@ export const transactionsApi = {
   recent: (limit?: number) => api.get('/transactions/recent', { params: { limit } }),
 };
 
+// Disbursements
+export const disbursementsApi = {
+  list: (params?: Record<string, unknown>) => api.get('/disbursements', { params }),
+  get: (id: string) => api.get(`/disbursements/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/disbursements', data),
+  updateStatus: (id: string, status: string, failureReason?: string) => api.patch(`/disbursements/${id}/status`, { status, failureReason }),
+};
+
 // Refunds
 export const refundsApi = {
   list: (params?: Record<string, unknown>) => api.get('/refunds', { params }),

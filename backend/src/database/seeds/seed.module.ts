@@ -7,10 +7,11 @@ import { Customer } from '../../modules/customers/entities/customer.entity';
 import { PaymentMethod } from '../../modules/payment-methods/entities/payment-method.entity';
 import { Transaction } from '../../modules/transactions/entities/transaction.entity';
 import { WebhookLog } from '../../modules/webhooks/entities/webhook-log.entity';
+import { Disbursement } from '../../modules/disbursements/entities/disbursement.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Merchant, Customer, PaymentMethod, Transaction, WebhookLog]),
+    TypeOrmModule.forFeature([User, Merchant, Customer, PaymentMethod, Transaction, WebhookLog, Disbursement]),
   ],
   providers: [SeedService],
   exports: [SeedService],

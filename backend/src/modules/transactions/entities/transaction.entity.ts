@@ -32,6 +32,11 @@ export enum TransactionCurrency {
   SGD = 'SGD',
 }
 
+export enum SettlementType {
+  T0 = 'T0',
+  T1 = 'T1',
+}
+
 @Entity('transactions')
 @Index(['merchantId', 'createdAt'])
 @Index(['status', 'createdAt'])
@@ -41,6 +46,15 @@ export class Transaction {
 
   @Column({ unique: true })
   orderId!: string;
+
+  @Column({ nullable: true })
+  issuerOrderId!: string;
+
+  @Column({ nullable: true })
+  refId!: string;
+
+  @Column({ nullable: true })
+  merchantRefId!: string;
 
   @Column()
   merchantId!: string;
@@ -80,6 +94,12 @@ export class Transaction {
 
   @Column({ nullable: true })
   processedAt!: Date;
+
+  @Column({ type: 'enum', enum: SettlementType, default: SettlementType.T1 })
+  settlementType!: SettlementType;
+
+  @Column({ nullable: true })
+  settlementDate!: Date;
 
   @ManyToOne(() => Merchant, (merchant) => merchant.transactions)
   @JoinColumn({ name: 'merchantId' })

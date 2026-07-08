@@ -2,9 +2,32 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { Transaction, TransactionStatus } from './entities/transaction.entity';
+import { Transaction, TransactionStatus, SettlementType } from './entities/transaction.entity';
 import { CreateTransactionDto } from './dto/transaction.dto';
 import { PaginationDto, PaginatedResponseDto } from '../../common/dto/pagination.dto';
+
+export function calculateSettlementDate(createdAt: Date, type: SettlementType): Date {
+  const date = new Date(createdAt);
+  if (type === SettlementType.T0) {
+    return date;
+  }
+  
+  const day = date.getDay();
+  if (day === 6) { // Saturday
+    date.setDate(date.getDate() + 2); // Monday
+  } else if (day === 0) { // Sunday
+    date.setDate(date.getDate() + 1); // Monday
+  }
+  
+  date.setDate(date.getDate() + 1);
+  if (date.getDay() === 6) {
+    date.setDate(date.getDate() + 2);
+  } else if (date.getDay() === 0) {
+    date.setDate(date.getDate() + 1);
+  }
+  
+  return date;
+}
 
 @Injectable()
 export class TransactionsService {
@@ -71,6 +94,9 @@ export class TransactionsService {
     const transaction = this.transactionRepository.create({
       ...dto,
       orderId,
+      issuerOrderId: dto.issuerOrderId || `ISS-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      refId: dto.refId || `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      merchantRefId: dto.merchantRefId || `MREF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
       idempotencyKey,
       fee,
       netAmount,
@@ -88,6 +114,9 @@ export class TransactionsService {
     }
     if (status === TransactionStatus.SUCCESS || status === TransactionStatus.FAILED) {
       transaction.processedAt = new Date();
+      if (status === TransactionStatus.SUCCESS) {
+        transaction.settlementDate = calculateSettlementDate(transaction.createdAt, transaction.settlementType);
+      }
     }
     return this.transactionRepository.save(transaction);
   }

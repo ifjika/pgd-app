@@ -20,8 +20,12 @@ export class DisbursementsService {
       endDate?: string;
     },
   ): Promise<PaginatedResponseDto<Disbursement>> {
-    const { page, limit, sortBy, sortOrder, status, merchantId, startDate, endDate } = query;
-    const skip = (page - 1) * limit;
+    const page = Math.max(1, parseInt(String(query.page || 1), 10));
+    const limit = Math.max(1, parseInt(String(query.limit || 20), 10));
+    const sortBy = String(query.sortBy || 'createdAt');
+    const sortOrder = (String(query.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
+    const { status, merchantId, startDate, endDate } = query;
+    const skip = Math.max(0, (page - 1) * limit);
 
     const qb = this.disbursementRepository
       .createQueryBuilder('disbursement')
@@ -32,6 +36,12 @@ export class DisbursementsService {
     }
     if (merchantId) {
       qb.andWhere('disbursement.merchantId = :merchantId', { merchantId });
+    }
+    if (query.search) {
+      qb.andWhere(
+        '(disbursement.orderId LIKE :search OR disbursement.recipientName LIKE :search OR disbursement.recipientAccount LIKE :search OR disbursement.channel LIKE :search)',
+        { search: `%${query.search}%` },
+      );
     }
     if (startDate && endDate) {
       qb.andWhere('disbursement.createdAt BETWEEN :startDate AND :endDate', {

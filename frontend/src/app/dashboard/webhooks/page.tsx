@@ -15,8 +15,12 @@ export default function WebhooksPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    try { const res = await webhooksApi.list({ limit: 30 }); setLogs(res.data.data.data || []); }
-    catch (err) { console.error(err); } finally { setLoading(false); }
+    try {
+      const res = await webhooksApi.list({ page: 1, limit: 30, sortBy: "createdAt", sortOrder: "DESC" });
+      const list = res.data?.data?.data || (Array.isArray(res.data?.data) ? res.data.data : []);
+      setLogs(Array.isArray(list) ? list : []);
+    } catch (err) { console.error("Failed to fetch webhooks:", err); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); const i = setInterval(fetchData, 15000); return () => clearInterval(i); }, [fetchData]);

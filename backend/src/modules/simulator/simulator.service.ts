@@ -11,7 +11,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { PaymentMethod } from '../payment-methods/entities/payment-method.entity';
 import { Refund, RefundStatus } from '../refunds/entities/refund.entity';
 import { WebhookLog, WebhookEvent, WebhookDeliveryStatus } from '../webhooks/entities/webhook-log.entity';
-import { Disbursement, DisbursementStatus } from '../disbursements/entities/disbursement.entity';
+import { Disbursement, DisbursementStatus, DisbursementChannelType } from '../disbursements/entities/disbursement.entity';
 
 @Injectable()
 export class SimulatorService {
@@ -280,6 +280,59 @@ export class SimulatorService {
       }
     } catch (error) {
       this.logger.error('Simulator error processing refunds:', error);
+    }
+  }
+
+  // Create disbursement requests every 90 seconds
+  @Cron('*/90 * * * * *')
+  async createDisbursements() {
+    if (!this.isEnabled) return;
+
+    try {
+      if (Math.random() > 0.40) return; // ~40% chance per cycle
+
+      const merchants = await this.merchantRepo.find({ where: { status: 'active' as any } });
+      if (merchants.length === 0) return;
+
+      const merchant = merchants[Math.floor(Math.random() * merchants.length)]!;
+
+      const recipients = [
+        { name: 'Alice Santoso', account: '1234567890', channel: 'MANDIRI', channelType: DisbursementChannelType.BANK_TRANSFER },
+        { name: 'Budi Pratama', account: '08129876543', channel: 'GOPAY', channelType: DisbursementChannelType.E_WALLET },
+        { name: 'Citra Dewi', account: '8877665544', channel: 'BCA', channelType: DisbursementChannelType.BANK_TRANSFER },
+        { name: 'Dewi Lestari', account: '08571122334', channel: 'DANA', channelType: DisbursementChannelType.E_WALLET },
+        { name: 'Eko Wijaya', account: '5544332211', channel: 'BRI', channelType: DisbursementChannelType.BANK_TRANSFER },
+      ];
+      const r = recipients[Math.floor(Math.random() * recipients.length)]!;
+      const amount = Math.floor(Math.random() * 2000000 + 50000);
+      const fee = 1500;
+      const netAmount = amount - fee;
+
+      const now = Date.now();
+      const rand = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      const disbursement = this.disbursementRepo.create({
+        orderId: `DIS-${now}-${rand()}`,
+        issuerOrderId: `ISS-${now}-${rand()}`,
+        refId: `REF-${now}-${rand()}`,
+        merchantRefId: `MREF-${now}-${rand()}`,
+        merchantId: merchant.id,
+        amount,
+        fee,
+        netAmount,
+        currency: 'IDR',
+        status: DisbursementStatus.PENDING,
+        channelType: r.channelType,
+        channel: r.channel,
+        recipientAccount: r.account,
+        recipientName: r.name,
+        description: `Automated simulator disbursement to ${r.name}`,
+      });
+
+      await this.disbursementRepo.save(disbursement);
+      this.logger.debug(`💸 Simulator: Created disbursement of IDR ${amount} for ${merchant.name}`);
+    } catch (error) {
+      this.logger.error('Simulator error creating disbursements:', error);
     }
   }
 

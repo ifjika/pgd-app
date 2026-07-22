@@ -16,11 +16,12 @@ export default function RefundsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const params: Record<string, unknown> = { limit: 30 };
+      const params: Record<string, unknown> = { page: 1, limit: 30, sortBy: "createdAt", sortOrder: "DESC" };
       if (status) params.status = status;
       const res = await refundsApi.list(params);
-      setRefunds(res.data.data.data || []);
-    } catch (err) { console.error(err); }
+      const list = res.data?.data?.data || (Array.isArray(res.data?.data) ? res.data.data : []);
+      setRefunds(Array.isArray(list) ? list : []);
+    } catch (err) { console.error("Failed to fetch refunds:", err); }
     finally { setLoading(false); }
   }, [status]);
 

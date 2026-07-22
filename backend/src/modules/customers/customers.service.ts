@@ -12,8 +12,12 @@ export class CustomersService {
   ) {}
 
   async findAll(query: PaginationDto & { merchantId?: string }): Promise<PaginatedResponseDto<Customer>> {
-    const { page, limit, search, sortBy, sortOrder, merchantId } = query;
-    const skip = (page - 1) * limit;
+    const page = Math.max(1, parseInt(String(query.page || 1), 10));
+    const limit = Math.max(1, parseInt(String(query.limit || 20), 10));
+    const sortBy = String(query.sortBy || 'createdAt');
+    const sortOrder = (String(query.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
+    const { search, merchantId } = query;
+    const skip = Math.max(0, (page - 1) * limit);
 
     const where: Record<string, unknown> = {};
     if (search) {

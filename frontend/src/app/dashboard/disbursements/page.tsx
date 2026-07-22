@@ -64,8 +64,9 @@ export default function DisbursementsPage() {
       if (status) params.status = status;
       if (search) params.search = search;
       const res = await disbursementsApi.list(params);
-      setDisbursements(res.data.data || []);
-      setTotalPages(res.data.meta?.totalPages || 1);
+      const list = res.data?.data?.data || (Array.isArray(res.data?.data) ? res.data.data : []);
+      setDisbursements(Array.isArray(list) ? list : []);
+      setTotalPages(res.data?.data?.meta?.totalPages || res.data?.meta?.totalPages || 1);
     } catch (err) {
       console.error("Failed to fetch disbursements:", err);
     } finally {

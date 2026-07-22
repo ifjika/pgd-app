@@ -44,7 +44,7 @@ export default function DisbursementDetailPage() {
     const fetchDb = async () => {
       try {
         const res = await disbursementsApi.get(params.id as string);
-        setDb(res.data);
+        setDb(res.data?.data || res.data);
       } catch {
         console.error("Failed to load disbursement");
       } finally {
@@ -137,7 +137,7 @@ export default function DisbursementDetailPage() {
           </div>
 
           {/* Reference IDs & Merchant */}
-          <div className="glass-card" style={{ padding: 24 }} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="glass-card" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
             <div>
               <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Reference IDs</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

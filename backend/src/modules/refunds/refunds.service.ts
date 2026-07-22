@@ -16,12 +16,15 @@ export class RefundsService {
   ) {}
 
   async findAll(query: PaginationDto & { status?: RefundStatus }): Promise<PaginatedResponseDto<Refund>> {
-    const { page, limit, sortBy, sortOrder, status } = query;
-    const skip = (page - 1) * limit;
+    const page = Math.max(1, parseInt(String(query.page || 1), 10));
+    const limit = Math.max(1, parseInt(String(query.limit || 20), 10));
+    const sortBy = String(query.sortBy || 'createdAt');
+    const sortOrder = (String(query.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
+    const skip = Math.max(0, (page - 1) * limit);
 
     const where: Record<string, unknown> = {};
-    if (status) {
-      where.status = status;
+    if (query.status) {
+      where.status = query.status;
     }
 
     const [data, total] = await this.refundRepository.findAndCount({

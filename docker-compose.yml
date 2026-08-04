@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   pgd-backend:
@@ -14,7 +14,8 @@ services:
       - DB_PORT=${DB_PORT}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_DATABASE=${DB_DATABASE}
+      - DB_DATABASE=${DB_DATABASE:-test}
+      - DB_NAME=${DB_NAME:-test}
       - DB_SSL=true
       - JWT_SECRET=${JWT_SECRET:-supersecret}
       - SIMULATOR_ENABLED=true
@@ -30,4 +31,18 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:4000
     depends_on:
       - pgd-backend
+    restart: always
+
+  tunnel-backend:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url https://detected-joke-intermediate-presidential.trycloudflare.com
+    depends_on:
+      - pgd-backend
+    restart: always
+
+  tunnel-frontend:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url https://epinions-herald-twiki-suites.trycloudflare.com
+    depends_on:
+      - pgd-frontend
     restart: always

@@ -97,7 +97,7 @@ export default function AnalyticsPage() {
               {pmData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={pmData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="count" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    <Pie data={pmData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="count" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                       {pmData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                     <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, color: "#f1f5f9" }} />

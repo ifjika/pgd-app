@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { transactionsApi } from "@/lib/api";
-import { formatCurrency, formatDate, getStatusBadgeClass } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateShort, getStatusBadgeClass } from "@/lib/utils";
 
 interface Transaction {
   id: string;

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import * as crypto from 'crypto';
 import { Merchant } from './entities/merchant.entity';
 import { CreateMerchantDto, UpdateMerchantDto } from './dto/merchant.dto';
@@ -58,7 +58,7 @@ export class MerchantsService {
 
     const merchant = this.merchantRepository.create({
       ...dto,
-      apiKey: `pk_live_${uuidv4().replace(/-/g, '')}`,
+      apiKey: `pk_live_${randomUUID().replace(/-/g, '')}`,
       secretKey: `sk_live_${crypto.randomBytes(32).toString('hex')}`,
     });
 

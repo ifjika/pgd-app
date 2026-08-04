@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import * as crypto from 'crypto';
 import { User, UserRole } from '../../modules/auth/entities/user.entity';
 import { Merchant, MerchantStatus } from '../../modules/merchants/entities/merchant.entity';
@@ -166,7 +166,7 @@ export class SeedService implements OnModuleInit {
     for (const data of merchantsData) {
       const merchant = this.merchantRepo.create({
         ...data,
-        apiKey: `pk_live_${uuidv4().replace(/-/g, '')}`,
+        apiKey: `pk_live_${randomUUID().replace(/-/g, '')}`,
         secretKey: `sk_live_${crypto.randomBytes(32).toString('hex')}`,
         status: MerchantStatus.ACTIVE,
         webhookUrl: `https://${data.code.toLowerCase()}.example.com/webhooks/pgd`,
@@ -303,7 +303,7 @@ export class SeedService implements OnModuleInit {
         status,
         settlementType,
         settlementDate: status === TransactionStatus.SUCCESS ? calculateSettlementDate(createdAt, settlementType) : undefined,
-        idempotencyKey: uuidv4(),
+        idempotencyKey: randomUUID(),
         description: descriptions[Math.floor(Math.random() * descriptions.length)],
         metadata: { source: 'seed', batchId: 'initial' },
         failureReason: status === TransactionStatus.FAILED ? failureReasons[Math.floor(Math.random() * failureReasons.length)] : undefined,

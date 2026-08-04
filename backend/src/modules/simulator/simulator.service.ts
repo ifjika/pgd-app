@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { Transaction, TransactionStatus, TransactionCurrency, SettlementType } from '../transactions/entities/transaction.entity';
 import { calculateSettlementDate } from '../transactions/transactions.service';
 import { Merchant } from '../merchants/entities/merchant.entity';
@@ -86,7 +86,7 @@ export class SimulatorService {
           currency,
           status: TransactionStatus.PENDING,
           settlementType: Math.random() < 0.3 ? SettlementType.T0 : SettlementType.T1,
-          idempotencyKey: uuidv4(),
+          idempotencyKey: randomUUID(),
           description: descriptions[Math.floor(Math.random() * descriptions.length)],
           metadata: { source: 'simulator', generatedAt: new Date().toISOString() },
         });

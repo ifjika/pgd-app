@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { Transaction, TransactionStatus, SettlementType } from './entities/transaction.entity';
 import { CreateTransactionDto } from './dto/transaction.dto';
 import { PaginationDto, PaginatedResponseDto } from '../../common/dto/pagination.dto';
@@ -93,7 +93,7 @@ export class TransactionsService {
 
   async create(dto: CreateTransactionDto): Promise<Transaction> {
     const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const idempotencyKey = uuidv4();
+    const idempotencyKey = randomUUID();
 
     const feePercentage = 2.9; // Default, could be fetched from merchant
     const fee = parseFloat((dto.amount * feePercentage / 100).toFixed(2));

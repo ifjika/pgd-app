@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, X, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { transactionsApi } from "@/lib/api";
+import { X, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { transactionsApi, merchantsApi } from "@/lib/api";
 import { formatCurrency, formatDateShort, formatDate, getStatusBadgeClass } from "@/lib/utils";
+import TransactionFilterPopover, { FilterValues } from "@/components/ui/TransactionFilterPopover";
 
 interface Transaction {
   id: string;
@@ -42,19 +43,46 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [status, setStatus] = useState("");
+  
+  // Search State
   const [search, setSearch] = useState("");
+
+  // Applied Filter Values State
+  const [filterValues, setFilterValues] = useState<FilterValues>({
+    statuses: [],
+    merchants: [],
+    startDate: "",
+    endDate: "",
+    minAmount: "",
+    maxAmount: "",
+  });
+
+  // Merchants List for Filter Options
+  const [merchantsList, setMerchantsList] = useState<{ id: string; name: string }[]>([]);
 
   // Modal State
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
   const [tx, setTx] = useState<Transaction | null>(null);
   const [loadingTx, setLoadingTx] = useState(false);
 
+  useEffect(() => {
+    merchantsApi.list({ limit: 100 }).then((res) => {
+      setMerchantsList(res.data.data.data || []);
+    }).catch(console.error);
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       const params: Record<string, unknown> = { page, limit: 15, sortBy: "createdAt", sortOrder: "DESC" };
-      if (status) params.status = status;
+      if (filterValues.statuses.length > 0) params.status = filterValues.statuses.join(",");
       if (search) params.search = search;
+      if (filterValues.startDate) params.startDate = filterValues.startDate;
+      if (filterValues.endDate) params.endDate = filterValues.endDate;
+      if (filterValues.minAmount) params.minAmount = Number(filterValues.minAmount);
+      if (filterValues.maxAmount) params.maxAmount = Number(filterValues.maxAmount);
+      if (filterValues.merchants.length > 0) {
+        params.merchantIds = filterValues.merchants.map((m) => m.id).join(",");
+      }
       const res = await transactionsApi.list(params);
       setTransactions(res.data.data.data || []);
       setTotalPages(res.data.data.meta?.totalPages || 1);
@@ -63,7 +91,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, status, search]);
+  }, [page, search, filterValues]);
 
   useEffect(() => {
     fetchData();
@@ -111,22 +139,34 @@ export default function TransactionsPage() {
         </div>
       </div>
       <div className="page-body">
-        {/* Filters */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-          <div className="input-group" style={{ flex: 1, maxWidth: 320 }}>
-            <Search size={16} className="input-icon" />
-            <input className="input" placeholder="Search transactions..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-          </div>
-          <select className="input" style={{ width: 180 }} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="success">Success</option>
-            <option value="failed">Failed</option>
-            <option value="expired">Expired</option>
-            <option value="refunded">Refunded</option>
-          </select>
-        </div>
+        {/* Reusable Filter Popover Component */}
+        <TransactionFilterPopover
+          search={search}
+          onSearchChange={(val) => {
+            setSearch(val);
+            setPage(1);
+          }}
+          filterValues={filterValues}
+          merchantsList={merchantsList}
+          onApply={(newValues) => {
+            setFilterValues(newValues);
+            setPage(1);
+          }}
+          onReset={() => {
+            setFilterValues({
+              statuses: [],
+              merchants: [],
+              startDate: "",
+              endDate: "",
+              minAmount: "",
+              maxAmount: "",
+            });
+            setPage(1);
+          }}
+        />
+
+
+
 
         {/* Table */}
         <div className="glass-card" style={{ overflow: "hidden" }}>

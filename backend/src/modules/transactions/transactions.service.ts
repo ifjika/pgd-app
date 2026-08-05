@@ -48,11 +48,14 @@ export class TransactionsService {
     query: PaginationDto & {
       status?: TransactionStatus;
       merchantId?: string;
+      merchantIds?: string | string[];
+      minAmount?: number;
+      maxAmount?: number;
       startDate?: string;
       endDate?: string;
     },
   ): Promise<PaginatedResponseDto<Transaction>> {
-    const { page, limit, sortBy, sortOrder, status, merchantId, startDate, endDate } = query;
+    const { page, limit, sortBy, sortOrder, status, search, merchantId, merchantIds, minAmount, maxAmount, startDate, endDate } = query;
     const skip = (page - 1) * limit;
 
     const qb = this.transactionRepository
@@ -61,18 +64,44 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.customer', 'customer')
       .leftJoinAndSelect('transaction.paymentMethod', 'paymentMethod');
 
-    if (status) {
-      qb.andWhere('transaction.status = :status', { status });
+    if (search) {
+      qb.andWhere(
+        '(transaction.orderId LIKE :search OR transaction.description LIKE :search OR merchant.name LIKE :search)',
+        { search: `%${search}%` },
+      );
     }
-    if (merchantId) {
+    if (status) {
+      const statusList = status.split(',').map((s) => s.trim()).filter(Boolean);
+      if (statusList.length > 1) {
+        qb.andWhere('transaction.status IN (:...statusList)', { statusList });
+      } else if (statusList.length === 1) {
+        qb.andWhere('transaction.status = :status', { status: statusList[0] });
+      }
+    }
+
+    if (merchantIds) {
+      const ids = Array.isArray(merchantIds) ? merchantIds : merchantIds.split(',').filter(Boolean);
+      if (ids.length > 0) {
+        qb.andWhere('transaction.merchantId IN (:...merchantIds)', { merchantIds: ids });
+      }
+    } else if (merchantId) {
       qb.andWhere('transaction.merchantId = :merchantId', { merchantId });
     }
-    if (startDate && endDate) {
-      qb.andWhere('transaction.createdAt BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
-      });
+    if (minAmount !== undefined && minAmount !== null && minAmount !== (' ' as any)) {
+      qb.andWhere('transaction.amount >= :minAmount', { minAmount });
     }
+    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== (' ' as any)) {
+      qb.andWhere('transaction.amount <= :maxAmount', { maxAmount });
+    }
+    if (startDate) {
+      qb.andWhere('transaction.createdAt >= :startDate', { startDate: new Date(startDate) });
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      qb.andWhere('transaction.createdAt <= :endDate', { endDate: end });
+    }
+
 
     qb.orderBy(`transaction.${sortBy}`, sortOrder).skip(skip).take(limit);
 

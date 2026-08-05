@@ -24,7 +24,7 @@ export class DisbursementsService {
     const limit = Math.max(1, parseInt(String(query.limit || 20), 10));
     const sortBy = String(query.sortBy || 'createdAt');
     const sortOrder = (String(query.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
-    const { status, merchantId, startDate, endDate } = query;
+    const { status, merchantId, merchantIds, startDate, endDate, minAmount, maxAmount } = query;
     const skip = Math.max(0, (page - 1) * limit);
 
     const qb = this.disbursementRepository
@@ -32,23 +32,42 @@ export class DisbursementsService {
       .leftJoinAndSelect('disbursement.merchant', 'merchant');
 
     if (status) {
-      qb.andWhere('disbursement.status = :status', { status });
+      const statusList = String(status).split(',').map((s) => s.trim()).filter(Boolean);
+      if (statusList.length === 1) {
+        qb.andWhere('disbursement.status = :status', { status: statusList[0] });
+      } else if (statusList.length > 1) {
+        qb.andWhere('disbursement.status IN (:...statusList)', { statusList });
+      }
     }
-    if (merchantId) {
+    if (merchantIds) {
+      const mList = String(merchantIds).split(',').map((s) => s.trim()).filter(Boolean);
+      if (mList.length > 0) {
+        qb.andWhere('disbursement.merchantId IN (:...mList)', { mList });
+      }
+    } else if (merchantId) {
       qb.andWhere('disbursement.merchantId = :merchantId', { merchantId });
     }
     if (query.search) {
       qb.andWhere(
-        '(disbursement.orderId LIKE :search OR disbursement.recipientName LIKE :search OR disbursement.recipientAccount LIKE :search OR disbursement.channel LIKE :search)',
+        '(disbursement.orderId LIKE :search OR disbursement.recipientName LIKE :search OR disbursement.recipientAccount LIKE :search OR disbursement.channel LIKE :search OR merchant.name LIKE :search)',
         { search: `%${query.search}%` },
       );
     }
-    if (startDate && endDate) {
-      qb.andWhere('disbursement.createdAt BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
-      });
+    if (startDate) {
+      qb.andWhere('disbursement.createdAt >= :startDate', { startDate: new Date(String(startDate)) });
     }
+    if (endDate) {
+      const eDate = new Date(String(endDate));
+      eDate.setHours(23, 59, 59, 999);
+      qb.andWhere('disbursement.createdAt <= :endDate', { endDate: eDate });
+    }
+    if (minAmount !== undefined && minAmount !== null && minAmount !== '') {
+      qb.andWhere('disbursement.amount >= :minAmount', { minAmount: Number(minAmount) });
+    }
+    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== '') {
+      qb.andWhere('disbursement.amount <= :maxAmount', { maxAmount: Number(maxAmount) });
+    }
+
 
     qb.orderBy(`disbursement.${sortBy}`, sortOrder).skip(skip).take(limit);
 

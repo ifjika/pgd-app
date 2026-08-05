@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Send, X, Landmark, Wallet } from "lucide-react";
+import { Plus, Send, X, Landmark, Wallet, Clock, CheckCircle, XCircle, AlertCircle, RefreshCcw } from "lucide-react";
 import { disbursementsApi, merchantsApi } from "@/lib/api";
-import { formatCurrency, formatDateShort, getStatusBadgeClass } from "@/lib/utils";
+import { formatCurrency, formatDateShort, formatDate, getStatusBadgeClass } from "@/lib/utils";
 import TransactionFilterPopover, { FilterValues } from "@/components/ui/TransactionFilterPopover";
 
 interface Merchant {
@@ -32,6 +32,12 @@ interface Disbursement {
   merchant?: { name: string };
 }
 
+const statusTimeline = [
+  { key: "pending", label: "Created", icon: Clock },
+  { key: "processing", label: "Processing", icon: AlertCircle },
+  { key: "success", label: "Completed", icon: CheckCircle },
+];
+
 export default function DisbursementsPage() {
   const [disbursements, setDisbursements] = useState<Disbursement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +59,7 @@ export default function DisbursementsPage() {
 
   const [merchantsList, setMerchantsList] = useState<Merchant[]>([]);
 
-  // Modal State
+  // Create Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [selectedMerchant, setSelectedMerchant] = useState("");
@@ -65,12 +71,47 @@ export default function DisbursementsPage() {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Detail Modal State
+  const [selectedDbId, setSelectedDbId] = useState<string | null>(null);
+  const [detailDb, setDetailDb] = useState<Disbursement | null>(null);
+  const [loadingDetailDb, setLoadingDetailDb] = useState(false);
+
   // Custom Ref IDs (Optional override)
   const [customRefs, setCustomRefs] = useState(false);
   const [orderId, setOrderId] = useState("");
   const [issuerOrderId, setIssuerOrderId] = useState("");
   const [refId, setRefId] = useState("");
   const [merchantRefId, setMerchantRefId] = useState("");
+
+  // Close modal on Escape press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedDbId(null);
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleRowClick = async (id: string) => {
+    setSelectedDbId(id);
+    setLoadingDetailDb(true);
+    setDetailDb(null);
+    try {
+      const res = await disbursementsApi.get(id);
+      setDetailDb(res.data.data);
+    } catch (err) {
+      console.error("Failed to load disbursement details:", err);
+    } finally {
+      setLoadingDetailDb(false);
+    }
+  };
+
+  const isFailedDb = detailDb ? (detailDb.status === "failed" || detailDb.status === "rejected") : false;
+  const currentDbStep = detailDb ? (isFailedDb ? 2 : ["pending", "processing", "success"].indexOf(detailDb.status)) : 0;
+
 
   // Load merchants list on mount
   useEffect(() => {
@@ -238,11 +279,11 @@ export default function DisbursementsPage() {
                 <tr><td colSpan={7}><div className="empty-state"><h3>No disbursements found</h3></div></td></tr>
               ) : (
                 disbursements.map((db) => (
-                  <tr key={db.id} style={{ cursor: "pointer" }}>
+                  <tr key={db.id} onClick={() => handleRowClick(db.id)} style={{ cursor: "pointer" }}>
                     <td>
-                      <Link href={`/dashboard/disbursements/${db.id}`} style={{ color: "var(--accent-primary)", textDecoration: "none", fontWeight: 600, fontSize: 13 }}>
+                      <span style={{ color: "var(--accent-primary)", fontWeight: 600, fontSize: 13 }}>
                         {db.orderId}
-                      </Link>
+                      </span>
                     </td>
                     <td>{db.merchant?.name || "—"}</td>
                     <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>
@@ -287,65 +328,61 @@ export default function DisbursementsPage() {
               <X size={20} />
             </button>
             
-            <h2 style={{ fontSize: 18, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-              <Send size={18} className="text-primary" />
-              New Disbursement Flow
-            </h2>
+            <h2 style={{ fontSize: 20, marginBottom: 16 }}>New Disbursement</h2>
 
-            <form onSubmit={handleCreateDisbursement} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <form onSubmit={handleCreateDisbursement} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label className="label">Merchant *</label>
+                <label className="label">Select Merchant *</label>
                 <select className="input" value={selectedMerchant} onChange={(e) => setSelectedMerchant(e.target.value)}>
-                  {merchants.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {merchants.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
                 <label className="label">Amount (IDR) *</label>
-                <input type="number" className="input" placeholder="e.g. 50000" value={amount} onChange={(e) => setAmount(e.target.value)} required min="1" />
+                <input type="number" className="input" placeholder="e.g. 100000" value={amount} onChange={(e) => setAmount(e.target.value)} min="1" step="any" required />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label className="label">Channel Type *</label>
-                  <select className="input" value={channelType} onChange={(e) => {
-                    setChannelType(e.target.value);
-                    setChannel(e.target.value === "bank_transfer" ? "MANDIRI" : "DANA");
-                  }}>
+                  <label className="label">Channel Type</label>
+                  <select className="input" value={channelType} onChange={(e) => setChannelType(e.target.value)}>
                     <option value="bank_transfer">Bank Transfer</option>
                     <option value="e_wallet">E-Wallet</option>
                   </select>
                 </div>
                 <div>
-                  <label className="label">Channel *</label>
-                  {channelType === "bank_transfer" ? (
-                    <select className="input" value={channel} onChange={(e) => setChannel(e.target.value)}>
-                      <option value="MANDIRI">MANDIRI</option>
-                      <option value="BRI">BRI</option>
-                      <option value="BNI">BNI</option>
-                      <option value="BCA">BCA</option>
-                      <option value="CIMB">CIMB</option>
-                    </select>
-                  ) : (
-                    <select className="input" value={channel} onChange={(e) => setChannel(e.target.value)}>
-                      <option value="DANA">DANA</option>
-                      <option value="OVO">OVO</option>
-                      <option value="GOPAY">GoPay</option>
-                      <option value="SHOPEEPAY">ShopeePay</option>
-                    </select>
-                  )}
+                  <label className="label">Channel</label>
+                  <select className="input" value={channel} onChange={(e) => setChannel(e.target.value)}>
+                    {channelType === "bank_transfer" ? (
+                      <>
+                        <option value="MANDIRI">Mandiri</option>
+                        <option value="BCA">BCA</option>
+                        <option value="BNI">BNI</option>
+                        <option value="BRI">BRI</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="GOPAY">GoPay</option>
+                        <option value="OVO">OVO</option>
+                        <option value="DANA">DANA</option>
+                        <option value="SHOPEEPAY">ShopeePay</option>
+                      </>
+                    )}
+                  </select>
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label className="label">Recipient Account / Phone *</label>
-                  <input type="text" className="input" placeholder="e.g. 123456789 or phone" value={recipientAccount} onChange={(e) => setRecipientAccount(e.target.value)} required />
-                </div>
-                <div>
-                  <label className="label">Recipient Name *</label>
-                  <input type="text" className="input" placeholder="e.g. Alice Santoso" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} required />
-                </div>
+              <div>
+                <label className="label">Recipient Account Number *</label>
+                <input type="text" className="input" placeholder="Account Number or Phone" value={recipientAccount} onChange={(e) => setRecipientAccount(e.target.value)} required />
+              </div>
+
+              <div>
+                <label className="label">Recipient Name *</label>
+                <input type="text" className="input" placeholder="Account Holder Name" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} required />
               </div>
 
               <div>
@@ -386,6 +423,155 @@ export default function DisbursementsPage() {
                 {submitting ? "Submitting..." : "Submit Disbursement"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Disbursement Detail Modal */}
+      {selectedDbId && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
+        }}>
+          <div 
+            className="glass-card" 
+            style={{ 
+              width: "95%", maxWidth: "1300px", minHeight: "75vh", maxHeight: "92vh", 
+              overflowY: "auto", padding: 36, position: "relative",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(99, 102, 241, 0.15)"
+            }}
+          >
+            <button onClick={() => setSelectedDbId(null)} style={{ position: "absolute", top: 24, right: 24, border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+              <X size={22} />
+            </button>
+
+
+            {loadingDetailDb || !detailDb ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div className="skeleton" style={{ height: 32, width: 300 }} />
+                <div className="skeleton" style={{ height: 60 }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  <div className="skeleton" style={{ height: 150 }} />
+                  <div className="skeleton" style={{ height: 150 }} />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 16 }}>
+                  <div>
+                    <h2 style={{ fontSize: 22, margin: 0 }}>{detailDb.orderId}</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "4px 0 0 0" }}>Disbursement Details</p>
+                  </div>
+                  <span className={`badge ${getStatusBadgeClass(detailDb.status)}`} style={{ fontSize: 14 }}>{detailDb.status}</span>
+                </div>
+
+                {/* Status Timeline */}
+                <div style={{ background: "var(--bg-card)", padding: "20px 32px", borderRadius: 12, marginBottom: 28 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, marginTop: 0, textAlign: "center", color: "var(--text-muted)", letterSpacing: "0.5px" }}>
+                    STATUS TIMELINE
+                  </h3>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", maxWidth: 650, margin: "0 auto" }}>
+                    {[
+                      { key: "pending", label: "Pending", icon: Clock },
+                      { key: "processing", label: "Processing", icon: RefreshCcw },
+                      { key: "success", label: "Success", icon: CheckCircle }
+                    ].map((step, i) => {
+                      const isActive = i <= currentDbStep;
+                      const Icon = isFailedDb && i === 2 ? XCircle : step.icon;
+                      return (
+                        <div key={step.key} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : undefined }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                            <div style={{
+                              width: 42, height: 42, borderRadius: "50%",
+                              background: isActive ? (isFailedDb && i === 2 ? "var(--status-failed-bg)" : "var(--status-success-bg)") : "#0f172a",
+                              border: `2px solid ${isActive ? (isFailedDb && i === 2 ? "var(--status-failed)" : "var(--status-success)") : "var(--border-subtle)"}`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: isActive ? (isFailedDb && i === 2 ? "var(--status-failed)" : "var(--status-success)") : "var(--text-muted)",
+                              boxShadow: isActive ? `0 0 14px ${isFailedDb && i === 2 ? "rgba(244,63,94,0.3)" : "rgba(16,185,129,0.3)"}` : "none"
+                            }}>
+                              <Icon size={18} />
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: isActive ? "var(--text-primary)" : "var(--text-muted)", whiteSpace: "nowrap" }}>
+                              {isFailedDb && i === 2 ? "Failed" : step.label}
+                            </span>
+                          </div>
+
+                          {i < 2 && (
+                            <div style={{
+                              flex: 1, height: 3, margin: "0 16px", marginTop: -24,
+                              background: i < currentDbStep ? "var(--gradient-primary)" : "var(--border-subtle)",
+                              borderRadius: 2
+                            }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                  {/* Disbursement Info */}
+                  <div style={{ background: "var(--bg-card)", padding: 18, borderRadius: 8 }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, marginTop: 0 }}>Disbursement Information</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {[
+                        ["Amount", formatCurrency(detailDb.amount, detailDb.currency)],
+                        ["Fee", formatCurrency(detailDb.fee || 0, detailDb.currency)],
+                        ["Net Amount", formatCurrency(detailDb.netAmount || detailDb.amount, detailDb.currency)],
+                        ["Currency", detailDb.currency],
+                        ["Channel Type", detailDb.channelType],
+                        ["Channel", detailDb.channel],
+                        ["Recipient Account", detailDb.recipientAccount],
+                        ["Recipient Name", detailDb.recipientName],
+                        ["Description", detailDb.description || "—"],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{label}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600 }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Merchant & References */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ background: "var(--bg-card)", padding: 18, borderRadius: 8 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, marginTop: 0 }}>Parties</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {[
+                          ["Merchant", detailDb.merchant?.name || "—"],
+                          ["Created", formatDate(detailDb.createdAt)],
+                        ].map(([label, value]) => (
+                          <div key={String(label)} style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{label}</span>
+                            <span style={{ fontSize: 14, fontWeight: 500 }}>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ background: "var(--bg-card)", padding: 18, borderRadius: 8 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, marginTop: 0 }}>Reference IDs</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {[
+                          ["Order ID", detailDb.orderId],
+                          ["Issuer Order ID", detailDb.issuerOrderId || "—"],
+                          ["Ref ID", detailDb.refId || "—"],
+                          ["Merchant Ref ID", detailDb.merchantRefId || "—"],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</span>
+                            <span style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 600 }}>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

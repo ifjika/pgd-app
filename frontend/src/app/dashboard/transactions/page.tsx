@@ -237,11 +237,16 @@ export default function TransactionsPage() {
           <div 
             className="glass-card" 
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "95%", maxWidth: "1300px", padding: 28, position: "relative", maxHeight: "90vh", overflowY: "auto" }}
+            style={{ 
+              width: "95%", maxWidth: "1300px", minHeight: "75vh", maxHeight: "92vh", 
+              padding: 36, position: "relative", overflowY: "auto",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(99, 102, 241, 0.15)"
+            }}
           >
-            <button onClick={() => setSelectedTxId(null)} style={{ position: "absolute", top: 16, right: 16, border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer" }}>
-              <X size={20} />
+            <button onClick={() => setSelectedTxId(null)} style={{ position: "absolute", top: 24, right: 24, border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+              <X size={22} />
             </button>
+
 
             {loadingTx || !tx ? (
               <div style={{ padding: 40 }}>
@@ -263,33 +268,45 @@ export default function TransactionsPage() {
                 </div>
 
                 {/* Status Timeline */}
-                <div style={{ background: "var(--bg-card)", padding: 18, borderRadius: 8, marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, marginTop: 0 }}>Status Timeline</h3>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ background: "var(--bg-card)", padding: "20px 32px", borderRadius: 12, marginBottom: 28 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, marginTop: 0, textAlign: "center", color: "var(--text-muted)", letterSpacing: "0.5px" }}>
+                    STATUS TIMELINE
+                  </h3>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", maxWidth: 650, margin: "0 auto" }}>
                     {statusTimeline.map((step, i) => {
                       const isActive = i <= currentStep;
                       const Icon = isFailed && i === 2 ? XCircle : step.icon;
                       return (
-                        <div key={step.key} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                          <div style={{
-                            width: 36, height: 36, borderRadius: "50%",
-                            background: isActive ? (isFailed && i === 2 ? "var(--status-failed-bg)" : "var(--status-success-bg)") : "var(--bg-card)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            color: isActive ? (isFailed && i === 2 ? "var(--status-failed)" : "var(--status-success)") : "var(--text-muted)",
-                          }}>
-                            <Icon size={16} />
+                        <div key={step.key} style={{ display: "flex", alignItems: "center", flex: i < statusTimeline.length - 1 ? 1 : undefined }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                            <div style={{
+                              width: 42, height: 42, borderRadius: "50%",
+                              background: isActive ? (isFailed && i === 2 ? "var(--status-failed-bg)" : "var(--status-success-bg)") : "#0f172a",
+                              border: `2px solid ${isActive ? (isFailed && i === 2 ? "var(--status-failed)" : "var(--status-success)") : "var(--border-subtle)"}`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: isActive ? (isFailed && i === 2 ? "var(--status-failed)" : "var(--status-success)") : "var(--text-muted)",
+                              boxShadow: isActive ? `0 0 14px ${isFailed && i === 2 ? "rgba(244,63,94,0.3)" : "rgba(16,185,129,0.3)"}` : "none"
+                            }}>
+                              <Icon size={18} />
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: isActive ? "var(--text-primary)" : "var(--text-muted)", whiteSpace: "nowrap" }}>
+                              {isFailed && i === 2 ? "Failed" : step.label}
+                            </span>
                           </div>
-                          <span style={{ fontSize: 14, color: isActive ? "var(--text-primary)" : "var(--text-muted)" }}>
-                            {isFailed && i === 2 ? "Failed" : step.label}
-                          </span>
+
                           {i < statusTimeline.length - 1 && (
-                            <div style={{ flex: 1, height: 2, background: isActive ? "var(--accent-primary)" : "var(--border-subtle)", borderRadius: 1 }} />
+                            <div style={{
+                              flex: 1, height: 3, margin: "0 16px", marginTop: -24,
+                              background: i < currentStep ? "var(--gradient-primary)" : "var(--border-subtle)",
+                              borderRadius: 2
+                            }} />
                           )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
+
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                   {/* Payment Info */}

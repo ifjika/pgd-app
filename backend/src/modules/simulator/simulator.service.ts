@@ -395,4 +395,26 @@ export class SimulatorService {
   getStatus(): { enabled: boolean } {
     return { enabled: this.isEnabled };
   }
+
+  /**
+   * Manually execute a full simulation cycle (ideal for serverless environments)
+   */
+  async triggerSimulationCycle(force: boolean = false) {
+    if (!this.isEnabled && !force) {
+      return { success: false, message: 'Simulator is disabled' };
+    }
+
+    await this.createTransactions();
+    await this.processTransactions();
+    await this.createRefunds();
+    await this.processRefunds();
+    await this.createDisbursements();
+    await this.processDisbursements();
+
+    return {
+      success: true,
+      message: 'Simulation cycle executed successfully',
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

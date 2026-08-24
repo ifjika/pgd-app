@@ -18,15 +18,21 @@ export class DisbursementsController {
     @Query() paginationDto: PaginationDto,
     @Query('status') status?: DisbursementStatus,
     @Query('merchantId') merchantId?: string,
+    @Query('merchantIds') merchantIds?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('minAmount') minAmount?: number,
+    @Query('maxAmount') maxAmount?: number,
   ) {
     return this.disbursementsService.findAll({
       ...paginationDto,
       status,
       merchantId,
+      merchantIds,
       startDate,
       endDate,
+      minAmount,
+      maxAmount,
     });
   }
 

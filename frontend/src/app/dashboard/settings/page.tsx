@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Zap, ZapOff } from "lucide-react";
+import { Zap, ZapOff, Play, Check } from "lucide-react";
 import { simulatorApi } from "@/lib/api";
 
 export default function SettingsPage() {
   const [simulatorEnabled, setSimulatorEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+  const [triggerSuccess, setTriggerSuccess] = useState(false);
 
   useEffect(() => {
     simulatorApi.status().then(res => setSimulatorEnabled(res.data.data?.enabled ?? true)).catch(() => {});
@@ -21,6 +23,20 @@ export default function SettingsPage() {
     finally { setLoading(false); }
   };
 
+  const handleManualTrigger = async () => {
+    setTriggering(true);
+    setTriggerSuccess(false);
+    try {
+      await simulatorApi.trigger(true);
+      setTriggerSuccess(true);
+      setTimeout(() => setTriggerSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-header"><h1>Settings</h1></div>
@@ -31,7 +47,7 @@ export default function SettingsPage() {
           <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
             The simulator automatically generates dummy transactions, processes payments, creates refunds, and fires webhooks at regular intervals to simulate real-world payment gateway activity.
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 12, padding: "12px 20px",
               borderRadius: "var(--radius-md)", background: simulatorEnabled ? "var(--status-success-bg)" : "var(--status-failed-bg)",
@@ -44,6 +60,15 @@ export default function SettingsPage() {
             </div>
             <button className={`btn ${simulatorEnabled ? "btn-danger" : "btn-primary"}`} onClick={toggleSimulator} disabled={loading}>
               {loading ? "..." : simulatorEnabled ? "Stop Simulator" : "Start Simulator"}
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={handleManualTrigger}
+              disabled={triggering}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              {triggerSuccess ? <Check size={16} color="var(--status-success)" /> : <Play size={16} />}
+              {triggering ? "Running..." : triggerSuccess ? "Triggered!" : "Simulate 1 Cycle"}
             </button>
           </div>
           <div style={{ marginTop: 20, padding: 16, borderRadius: "var(--radius-sm)", background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.1)" }}>

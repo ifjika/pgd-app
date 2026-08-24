@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { X, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { transactionsApi, merchantsApi } from "@/lib/api";
+import { transactionsApi, merchantsApi, simulatorApi } from "@/lib/api";
 import { formatCurrency, formatDateShort, formatDate, getStatusBadgeClass } from "@/lib/utils";
 import TransactionFilterPopover, { FilterValues } from "@/components/ui/TransactionFilterPopover";
 
@@ -95,7 +95,14 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(async () => {
+      try {
+        await simulatorApi.trigger();
+      } catch (err) {
+        // Silently catch in case simulator is disabled or network hiccups
+      }
+      fetchData();
+    }, 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
 

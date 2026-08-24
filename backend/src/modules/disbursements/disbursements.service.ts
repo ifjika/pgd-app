@@ -16,8 +16,11 @@ export class DisbursementsService {
     query: PaginationDto & {
       status?: DisbursementStatus;
       merchantId?: string;
+      merchantIds?: string;
       startDate?: string;
       endDate?: string;
+      minAmount?: number;
+      maxAmount?: number;
     },
   ): Promise<PaginatedResponseDto<Disbursement>> {
     const page = Math.max(1, parseInt(String(query.page || 1), 10));
@@ -61,10 +64,10 @@ export class DisbursementsService {
       eDate.setHours(23, 59, 59, 999);
       qb.andWhere('disbursement.createdAt <= :endDate', { endDate: eDate });
     }
-    if (minAmount !== undefined && minAmount !== null && minAmount !== '') {
+    if (minAmount !== undefined && minAmount !== null && !isNaN(Number(minAmount))) {
       qb.andWhere('disbursement.amount >= :minAmount', { minAmount: Number(minAmount) });
     }
-    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== '') {
+    if (maxAmount !== undefined && maxAmount !== null && !isNaN(Number(maxAmount))) {
       qb.andWhere('disbursement.amount <= :maxAmount', { maxAmount: Number(maxAmount) });
     }
 

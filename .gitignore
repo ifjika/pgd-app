@@ -29,3 +29,9 @@ thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
+
+# IDEs and editors
+.idea/
+.vscode/
+.agents/
+*.suo

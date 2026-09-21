@@ -18,7 +18,7 @@ module.exports = {
     },
     {
       name: "pgd-frontend",
-      cwd: "./frontend",
+      cwd: "./",
       script: "npm",
       args: "start",
       env: {

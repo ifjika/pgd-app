@@ -98,7 +98,7 @@ export const paymentMethodsApi = {
 export const simulatorApi = {
   status: () => api.get('/simulator/status'),
   toggle: (enabled: boolean) => api.post('/simulator/toggle', { enabled }),
-  trigger: (force: boolean = false) => api.post(`/simulator/trigger${force ? '?force=true' : ''}`),
+  trigger: (force: boolean = false) => api.post(`/simulator/admin-trigger${force ? '?force=true' : ''}`),
 };
 
 export default api;
